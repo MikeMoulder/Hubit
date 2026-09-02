@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Catalog } from "@/components/Catalog";
 import { CartDrawer, QuickView } from "@/components/Overlays";
 import { RulesBar } from "@/components/RulesBar";
-import { AnnouncementBar, SiteFooter, SiteHeader } from "@/components/Shell";
+import { SiteFooter, SiteHeader } from "@/components/Shell";
 import { ToolRail } from "@/components/ToolRail";
 import { useToolSurface, useRuntime } from "@/lib/useHubit";
 import type { Category } from "@/lib/types";
@@ -20,8 +20,6 @@ export default function Page() {
 
   return (
     <>
-      <AnnouncementBar />
-
       {/* Header and rules travel together, so the gate never scrolls off screen. */}
       <div className="sticky top-0 z-30">
         <SiteHeader
@@ -49,7 +47,7 @@ export default function Page() {
         </aside>
       </main>
 
-      <SiteFooter />
+      <SiteFooter onCategory={setCategory} />
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
       <QuickView id={quickView} onClose={() => setQuickView(null)} />

@@ -1,9 +1,9 @@
 "use client";
 
-import { Search, ShoppingBag, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Search, ShoppingBag } from "lucide-react";
 import { CATEGORY_LABEL, countByCategory, money } from "@/lib/catalog";
 import * as store from "@/lib/store";
-import { useStore, useRuntime } from "@/lib/useHubit";
+import { useStore } from "@/lib/useHubit";
 import type { Category } from "@/lib/types";
 
 const CATEGORIES = Object.keys(CATEGORY_LABEL) as Category[];
@@ -12,23 +12,6 @@ const CATEGORIES = Object.keys(CATEGORY_LABEL) as Category[];
  * Store chrome. Everything here is ink, never accent: the accent belongs to the
  * agent layer and loses its meaning the moment it decorates a nav bar.
  */
-
-export function AnnouncementBar() {
-  const runtime = useRuntime();
-  const line =
-    runtime === "webmcp"
-      ? "An agent is connected to this tab. It can browse and fill your cart, and it cannot check out without you."
-      : "Set your rules, then let your agent do the shopping. It fills the cart, you approve the basket.";
-
-  return (
-    <div className="bg-[var(--color-ink)] text-[var(--color-ink-fg)]">
-      <div className="mx-auto flex max-w-[1400px] items-center gap-2 px-6 py-2 text-xs">
-        <ShieldCheck className="size-3.5 shrink-0 opacity-70" aria-hidden />
-        <p className="truncate">{line}</p>
-      </div>
-    </div>
-  );
-}
 
 export function SiteHeader({
   active,
@@ -162,61 +145,91 @@ function NavLink({
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({
+  onCategory,
+}: {
+  onCategory: (c: Category | "all") => void;
+}) {
+  const steps = [
+    "Set a budget and say what you already own",
+    "Ask your agent to build the setup",
+    "Watch the cart fill against your rules",
+    "Approve the basket, or withdraw at any point",
+  ];
+
   return (
-    <footer className="mt-10 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="mx-auto grid max-w-[1400px] gap-8 px-6 py-10 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="mt-14 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="mx-auto grid max-w-[1400px] gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.2fr_1.3fr]">
         <div>
           <p className="text-base font-semibold tracking-[-0.02em]">Hubit</p>
-          <p className="mt-2 max-w-xs text-sm text-[var(--color-muted)]">
-            A shop built so an agent can use it. You set the rules, it does the browsing,
-            and the checkout tool only exists once you say so.
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-[var(--color-muted)]">
+            Desk gear for people who would rather their agent did the shopping. You set
+            the budget, it does the browsing, and it cannot check out until you say so.
           </p>
         </div>
 
-        <FooterCol
-          title="Shop"
-          items={CATEGORIES.map((c) => `${CATEGORY_LABEL[c]} (${countByCategory(c)})`)}
-        />
-        <FooterCol
-          title="How this works"
-          items={[
-            "Set a budget and what you own",
-            "Ask your agent to build a setup",
-            "Approve the basket it lands on",
-            "Withdraw approval at any point",
-          ]}
-        />
-        <FooterCol
-          title="For agents"
-          items={[
-            "11 tools on document.modelContext",
-            "Reads are marked read only",
-            "Seller copy is marked untrusted",
-            "checkout is registered, never argued",
-          ]}
-        />
+        {/* These looked like links and did nothing. Now they filter the shelf. */}
+        <nav aria-label="Shop by category">
+          <h2 className="text-sm font-semibold">Shop</h2>
+          <ul className="mt-3 space-y-2">
+            {CATEGORIES.map((c) => (
+              <li key={c}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCategory(c);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="text-sm text-[var(--color-muted)] transition-colors hover:text-[var(--color-fg)] hover:underline"
+                >
+                  {CATEGORY_LABEL[c]}{" "}
+                  <span className="tabular-nums opacity-60">{countByCategory(c)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div>
+          <h2 className="text-sm font-semibold">How this works</h2>
+          <ol className="mt-3 space-y-2">
+            {steps.map((s, i) => (
+              <li key={s} className="flex gap-2.5 text-sm text-[var(--color-muted)]">
+                <span className="shrink-0 tabular-nums opacity-50">{i + 1}</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold">Open source</h2>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
+            The whole shop is one static page. No backend, no database, no accounts, and
+            nothing about you leaves the tab.
+          </p>
+          <a
+            href="https://github.com/MikeMoulder/Hubit"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium underline underline-offset-4 transition-opacity hover:opacity-70"
+          >
+            Read the source on GitHub
+            <ArrowUpRight className="size-3.5" aria-hidden />
+          </a>
+          <p className="mt-4 text-xs leading-relaxed text-[var(--color-muted)]">
+            Agent shopping needs Chrome with WebMCP enabled, or ChatGPT&rsquo;s in-app
+            browser. Everything here works by hand without either.
+          </p>
+        </div>
       </div>
 
       <div className="border-t border-[var(--color-border)]">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2 px-6 py-4 text-xs text-[var(--color-muted)]">
-          <p>Hubit is a demonstration shop. Nothing here ships and no card is charged.</p>
+          <p>Hubit is a demonstration shop. Nothing ships and no card is charged.</p>
           <p>Built for the WebMCP Challenge</p>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterCol({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div>
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <ul className="mt-2 space-y-1.5 text-sm text-[var(--color-muted)]">
-        {items.map((i) => (
-          <li key={i}>{i}</li>
-        ))}
-      </ul>
-    </div>
   );
 }

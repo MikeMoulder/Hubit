@@ -20,7 +20,7 @@
   --color-border: oklch(0.895 0.008 85);
   --color-border-strong: oklch(0.82 0.01 85);
   --color-fg: oklch(0.21 0.012 70);
-  --color-muted: oklch(0.475 0.012 75);
+  --color-muted: oklch(0.47 0.004 75);
 
   /* the shop */
   --color-ink: oklch(0.19 0.012 70);
