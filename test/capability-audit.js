@@ -27,13 +27,12 @@
   let pass = 0, fail = 0;
   const check = (name, actual, predicate, note) => {
     const okFlag = predicate(String(actual));
-    okFlag ? pass++ : fail++;
+    if (okFlag) pass++; else fail++;
     results.push(
       (okFlag ? "PASS " : "FAIL ") + name + (okFlag ? "" : "\n        got: " + String(actual).slice(0, 160)) + (note ? "\n        " + note : "")
     );
   };
   const has = (s) => (a) => a.toLowerCase().includes(s.toLowerCase());
-  const notThrew = (a) => !a.startsWith("__THREW__") && !a.startsWith("__ABSENT__");
 
   results.push("=== SURFACE ===");
   const names = (await tools()).map((t) => t.name).sort();

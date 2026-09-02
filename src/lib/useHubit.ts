@@ -51,7 +51,6 @@ export function useToolSurface() {
 
 export function useToolRows(): ToolRow[] {
   const state = useStore();
-  const live = store.checkoutLive(state);
 
   const counts = new Map<string, { n: number; last?: string }>();
   for (const c of state.calls) {

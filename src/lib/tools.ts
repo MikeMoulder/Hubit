@@ -3,7 +3,7 @@ import * as store from "./store";
 import type { Category, Product, ToolDef, ToolResult } from "./types";
 
 /**
- * The nine tools ARE the API of this project. There are no HTTP endpoints.
+ * The eleven tools ARE the API of this project. There are no HTTP endpoints.
  *
  * `inputSchema` does NOT validate (probe/FINDINGS.md finding 4), so every tool
  * validates its own arguments and returns failures as content rather than throwing:
@@ -94,7 +94,7 @@ function traced(def: ToolDef): ToolDef {
   };
 }
 
-// ── the eight always-on tools ────────────────────────────────────────────────
+// ── the ten always-on tools ──────────────────────────────────────────────────
 
 const BASE_DEFS: ToolDef[] = [
   {

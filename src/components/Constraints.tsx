@@ -10,7 +10,6 @@ export function Constraints() {
   const state = useStore();
   const v = store.violations(state);
   const total = store.cartTotalCents(state);
-  const over = v.find((x) => x.field === "budgetCents")?.overByCents ?? 0;
   const live = store.checkoutLive(state);
 
   return (
