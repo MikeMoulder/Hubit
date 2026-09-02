@@ -13,12 +13,13 @@
  *     our OWN change signal, and never render from `toolchange`.
  *  4. `inputSchema` does NOT validate. Every tool validates its own arguments.
  *  5. `executeTool(tool, args)` wants a RegisteredTool object and a JSON STRING, and
- *     returns a JSON STRING. Only relevant to the local simulated agent.
+ *     returns a JSON STRING. That is the agent's real path, and the path the
+ *     capability audit drives. There is no simulated path in this build.
  *  6. Registration must happen BEFORE any optional code. An unguarded call ahead of
  *     it once produced a page with zero tools and no visible error.
  */
 
-import type { RegisteredToolInfo, ToolDef, ToolHost, ToolResult } from "./types";
+import type { RegisteredToolInfo, ToolDef, ToolHost } from "./types";
 
 type Entry = { def: ToolDef; controller: AbortController };
 
@@ -97,19 +98,6 @@ class Host implements ToolHost {
       name: def.name,
       description: def.description,
     }));
-  }
-
-  /** Used by the local simulated agent and by tests. Not the agent's path. */
-  async invoke(name: string, args: unknown): Promise<ToolResult> {
-    const entry = this.entries.get(name);
-    if (!entry) {
-      // The gate, enforced identically in both runtimes.
-      return {
-        content: [{ type: "text", text: `No tool named "${name}" is registered.` }],
-        isError: true,
-      };
-    }
-    return entry.def.execute(args);
   }
 
   onChange(cb: () => void): () => void {

@@ -71,6 +71,5 @@ export interface ToolHost {
   readonly runtime: "webmcp" | "local";
   register(def: ToolDef): () => void;
   list(): RegisteredToolInfo[];
-  invoke(name: string, args: unknown): Promise<ToolResult>;
   onChange(cb: () => void): () => void;
 }
