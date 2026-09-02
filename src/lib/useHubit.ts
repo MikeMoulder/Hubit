@@ -59,12 +59,16 @@ export function useToolRows(): ToolRow[] {
     counts.set(c.name, { n: (prev?.n ?? 0) + 1, last: c.args });
   }
 
+  // Render from the host's ACTUAL registry, not from the BASE_TOOLS array. If a tool
+  // ever fails to register, the rail must show that rather than claim it is live.
+  const liveNames = new Set(getHost().list().map((t) => t.name));
+
   const rows: ToolRow[] = BASE_TOOLS.map((t) => ({
     name: t.name,
     description: t.description,
     readOnly: !!t.annotations?.readOnlyHint,
     untrusted: !!t.annotations?.untrustedContentHint,
-    registered: true,
+    registered: liveNames.has(t.name),
     callCount: counts.get(t.name)?.n ?? 0,
     lastArgs: counts.get(t.name)?.last,
   }));
@@ -75,7 +79,7 @@ export function useToolRows(): ToolRow[] {
     description: CHECKOUT_TOOL.description,
     readOnly: false,
     untrusted: false,
-    registered: live,
+    registered: liveNames.has(CHECKOUT_TOOL.name),
     gated: true,
     callCount: counts.get("checkout")?.n ?? 0,
     lastArgs: counts.get("checkout")?.last,

@@ -1,6 +1,6 @@
 import { CATALOG, byId, money } from "./catalog";
 import * as store from "./store";
-import type { Category, ToolDef, ToolResult } from "./types";
+import type { Category, Product, ToolDef, ToolResult } from "./types";
 
 /**
  * The nine tools ARE the API of this project. There are no HTTP endpoints.
@@ -36,6 +36,15 @@ function describe(id: string) {
     .map(([k, v]) => `${k}: ${v}`)
     .join(", ");
   return `${p.name} (${p.id}) · ${money(p.priceCents)} · ${p.category} · ${specs} · "${p.description}"`;
+}
+
+
+/** The shopper's priority is a real rule, not decoration: it orders what the agent sees. */
+function byPriority(list: typeof CATALOG) {
+  const p = store.getState().constraints.priority;
+  return [...list].sort((a, b) =>
+    p === "price" ? a.priceCents - b.priceCents : b.priceCents - a.priceCents
+  );
 }
 
 function cartSummary(): string {
@@ -116,7 +125,13 @@ const BASE_DEFS: ToolDef[] = [
         return true;
       });
       if (!hits.length) return ok("No products matched.");
-      return ok(hits.map((p) => describe(p.id)).join("\n"));
+      const priority = store.getState().constraints.priority;
+      return ok(
+        `Ordered by the shopper's stated priority (${priority}).\n` +
+          byPriority(hits)
+            .map((p) => describe(p.id))
+            .join("\n")
+      );
     },
   },
   {
@@ -237,6 +252,102 @@ const BASE_DEFS: ToolDef[] = [
       return ok(
         `Proposed raising the budget from ${money(from)} to ${money(value)}. Waiting for the shopper to approve. You cannot check out until they do.`
       );
+    },
+  },
+  {
+    name: "compare_products",
+    description:
+      "Compare two to five products side by side, spec by spec, with the price difference. Use this before choosing between candidates so the shopper can see the reasoning.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        product_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Between 2 and 5 product ids",
+        },
+      },
+      required: ["product_ids"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => {
+      const raw = obj(input)["product_ids"];
+      if (!Array.isArray(raw)) return fail("product_ids must be an array of product ids.");
+      if (raw.length < 2 || raw.length > 5) return fail("Compare between 2 and 5 products.");
+      const items: Product[] = [];
+      for (const id of raw) {
+        if (typeof id !== "string") return fail("Every product id must be a string.");
+        const p = byId(id);
+        if (!p) return fail(`No product with id "${id}".`);
+        items.push(p);
+      }
+      const cats = new Set(items.map((p) => p.category));
+      const keys = [...new Set(items.flatMap((p) => Object.keys(p.specs)))];
+      const rows = keys.map(
+        (k) => `${k}: ` + items.map((p) => `${p.name}=${p.specs[k] ?? "n/a"}`).join(" | ")
+      );
+      const prices = items.map((p) => p.priceCents);
+      const spread = Math.max(...prices) - Math.min(...prices);
+      return ok(
+        [
+          cats.size > 1
+            ? `Note: these are different categories (${[...cats].join(", ")}), so this is not a like for like comparison.`
+            : `Comparing ${items.length} ${[...cats][0]}s.`,
+          "price: " + items.map((p) => `${p.name}=${money(p.priceCents)}`).join(" | "),
+          ...rows,
+          `Spread between cheapest and dearest: ${money(spread)}.`,
+        ].join("\n")
+      );
+    },
+  },
+  {
+    name: "search_alternatives",
+    description:
+      "Find cheaper replacements for something in the cart, in the same category, and say what each one gives up. Use this BEFORE asking the shopper to raise their budget: saving their money is preferred to spending more of it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        product_id: { type: "string", description: "The item to replace" },
+        max_price_cents: { type: "number", description: "Optional ceiling for the replacement" },
+      },
+      required: ["product_id"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => {
+      const id = str(input, "product_id");
+      if (!id) return fail("product_id is required.");
+      const current = byId(id);
+      if (!current) return fail(`No product with id "${id}".`);
+      const ceiling = num(input, "max_price_cents");
+      const options = CATALOG.filter(
+        (p) =>
+          p.category === current.category &&
+          p.id !== current.id &&
+          p.priceCents < current.priceCents &&
+          (ceiling === null || p.priceCents <= ceiling)
+      ).sort((a, b) => b.priceCents - a.priceCents);
+
+      if (!options.length)
+        return ok(
+          `Nothing cheaper than ${current.name} in ${current.category}. Raising the budget may be the only option, and the shopper has to approve that.`
+        );
+
+      const inCart = store.getState().lines.some((l) => l.productId === id);
+      const lines = options.map((p) => {
+        const saving = current.priceCents - p.priceCents;
+        const lost = Object.keys(current.specs).filter(
+          (k) => current.specs[k] !== p.specs[k]
+        );
+        return `${p.name} (${p.id}) ${money(p.priceCents)}, saves ${money(saving)}. Gives up: ${
+          lost.length ? lost.map((k) => `${k} ${current.specs[k]} to ${p.specs[k] ?? "n/a"}`).join("; ") : "nothing listed"
+        }`;
+      });
+      const header = `Cheaper than ${current.name} (${money(current.priceCents)})${
+        inCart ? ", which is in the cart" : ""
+      }:`;
+      const footer =
+        "Swap it with update_quantity to 0 then add_to_cart, or leave it and propose a budget change.";
+      return ok([header, ...lines, footer].join("\n"));
     },
   },
 ];

@@ -37,7 +37,9 @@
 
   results.push("=== SURFACE ===");
   const names = (await tools()).map((t) => t.name).sort();
-  check("8 tools at load, checkout absent", names.join(","), (a) => !a.includes("checkout") && a.split(",").length === 8);
+  check("10 tools at load, checkout absent", names.join(","), (a) => !a.includes("checkout") && a.split(",").length === 10);
+  check("compare_products registered", names.join(","), has("compare_products"));
+  check("search_alternatives registered", names.join(","), has("search_alternatives"));
 
   results.push("=== search_products ===");
   check("no args returns catalog", await call("search_products"), has("mon-27-1440"));
@@ -90,6 +92,33 @@
   click("reject");
   await sleep(300);
   check("rejected proposal leaves rules alone", await call("get_constraints"), has("Budget: $1,200"));
+
+  results.push("=== compare_products ===");
+  check("two products compared", await call("compare_products", { product_ids: ["chair-ergo-mesh", "chair-mesh-mid"] }), (a) => has("Comparing 2 chairs")(a) && has("warranty")(a) && has("Spread")(a));
+  check("one product rejected", await call("compare_products", { product_ids: ["chair-stool"] }), has("between 2 and 5"));
+  check("six products rejected", await call("compare_products", { product_ids: ["a","b","c","d","e","f"] }), has("between 2 and 5"));
+  check("not an array rejected", await call("compare_products", { product_ids: "chair-stool" }), has("must be an array"));
+  check("unknown id rejected", await call("compare_products", { product_ids: ["chair-stool", "nope"] }), has("No product with id"));
+  check("mixed categories flagged", await call("compare_products", { product_ids: ["chair-stool", "mon-24-1080"] }), has("not a like for like"));
+
+  results.push("=== search_alternatives ===");
+  const alts = await call("search_alternatives", { product_id: "chair-ergo-mesh" });
+  check("finds cheaper options", alts, (a) => has("chair-mesh-mid")(a) && has("saves")(a));
+  check("names the trade-off", alts, has("Gives up"));
+  check("respects a ceiling", await call("search_alternatives", { product_id: "chair-ergo-mesh", max_price_cents: 15000 }), (a) => has("chair-budget-mesh")(a) && !has("chair-mesh-mid")(a));
+  check("cheapest item has no alternatives", await call("search_alternatives", { product_id: "mouse-light-wired" }), has("Nothing cheaper"));
+  check("unknown id rejected", await call("search_alternatives", { product_id: "nope" }), has("No product with id"));
+
+  results.push("=== priority is a real rule ===");
+  click("price");
+  await sleep(300);
+  const cheapFirst = await call("search_products", { category: "monitor" });
+  check("price priority puts cheapest first", cheapFirst, (a) => a.indexOf("mon-24-1080") < a.indexOf("mon-ultra-34"));
+  check("search states the ordering rule", cheapFirst, has("stated priority (price)"));
+  click("quality");
+  await sleep(300);
+  const dearFirst = await call("search_products", { category: "monitor" });
+  check("quality priority puts best first", dearFirst, (a) => a.indexOf("mon-ultra-34") < a.indexOf("mon-24-1080"));
 
   results.push("=== THE GATE ===");
   await call("add_to_cart", { product_id: "mon-ultra-34" });

@@ -71,6 +71,31 @@ export function Constraints() {
         </div>
       </fieldset>
 
+      <fieldset>
+        <legend className="mb-1.5 text-xs font-medium">Prioritise</legend>
+        <div className="flex gap-1.5">
+          {(["quality", "price"] as const).map((p) => {
+            const on = state.constraints.priority === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => store.setPriority(p)}
+                aria-pressed={on}
+                className={[
+                  "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                  on
+                    ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]"
+                    : "border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-muted)]",
+                ].join(" ")}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
       {/* Status. This is the panel that flips red at 0:25. */}
       <div
         className={[
