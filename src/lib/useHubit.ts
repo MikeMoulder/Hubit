@@ -49,6 +49,27 @@ export function useToolSurface() {
 
 }
 
+/**
+ * Subscribes to the host registry itself, not just to the app store.
+ *
+ * Registration happens inside useToolSurface's effect, which runs AFTER the render
+ * caused by the store change that opened the gate. Reading getHost().list() during
+ * render without subscribing therefore showed the registry as it was one update ago:
+ * approving the basket flipped the rules bar to "checkout is open" while the rail
+ * still said NOT REGISTERED, until some later store change happened to repaint it.
+ * That is the 0:40 beat, so it has to be exact.
+ *
+ * The snapshot is a joined string so React can compare it by value. Returning a fresh
+ * Set or array here would be a new reference every call and would never settle.
+ */
+function useLiveToolNames(): string {
+  return useSyncExternalStore(
+    (cb) => getHost().onChange(cb),
+    () => getHost().list().map((t) => t.name).sort().join(","),
+    () => ""
+  );
+}
+
 export function useToolRows(): ToolRow[] {
   const state = useStore();
 
@@ -60,7 +81,7 @@ export function useToolRows(): ToolRow[] {
 
   // Render from the host's ACTUAL registry, not from the BASE_TOOLS array. If a tool
   // ever fails to register, the rail must show that rather than claim it is live.
-  const liveNames = new Set(getHost().list().map((t) => t.name));
+  const liveNames = new Set(useLiveToolNames().split(",").filter(Boolean));
 
   const rows: ToolRow[] = BASE_TOOLS.map((t) => ({
     name: t.name,

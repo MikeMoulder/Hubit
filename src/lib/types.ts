@@ -13,6 +13,13 @@ export type Product = {
   description: string;
   /** /products/<id>.jpg when supplied. Falls back to an initials block. */
   image?: string;
+
+  // Storefront display only. No tool reads these, and they are never sent to an
+  // agent: they exist so the grid reads as a shop rather than a table of rows.
+  /** Corner flag on the card. One per product at most. */
+  badge?: "Best seller" | "New" | "Sale" | "Low stock";
+  /** Struck-through "was" price. Visual only, priceCents is always what you pay. */
+  compareAtCents?: number;
 };
 
 export type CartLine = { id: string; productId: string; qty: number };

@@ -25,11 +25,22 @@ type Entry = { def: ToolDef; controller: AbortController };
 
 /** Minimal shape of the WebMCP API we rely on. Deliberately narrow. */
 type ModelContextLike = {
+  // Chrome 152 returns a promise here. It is not documented as such and it is not
+  // awaited anywhere: the only thing that matters is that it REJECTS on abort, which
+  // has to be caught. See the call site in register().
   registerTool: (
     tool: Record<string, unknown>,
     options?: { signal?: AbortSignal }
-  ) => void;
+  ) => unknown;
 };
+
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as PromiseLike<unknown>).then === "function"
+  );
+}
 
 function getModelContext(): ModelContextLike | null {
   if (typeof document === "undefined") return null;
@@ -63,7 +74,7 @@ class Host implements ToolHost {
 
     if (this.mc) {
       try {
-        this.mc.registerTool(
+        const pending = this.mc.registerTool(
           {
             name: def.name,
             description: def.description,
@@ -75,6 +86,19 @@ class Host implements ToolHost {
           },
           { signal: controller.signal }
         );
+
+        // Chrome 152 returns a promise that REJECTS with AbortError the moment the
+        // signal fires. That rejection IS the revocation working, not a failure, so
+        // it must be swallowed: left unhandled it prints one red unhandledRejection
+        // per tool on every single gate change, which is exactly the beat the demo
+        // is recording. A rejection that arrives while the signal is NOT aborted is
+        // a real registration failure and still has to be visible. Finding 6.
+        if (isThenable(pending)) {
+          Promise.resolve(pending).catch((err: unknown) => {
+            if (controller.signal.aborted) return;
+            reportError(`registerTool(${def.name}) rejected`, err);
+          });
+        }
       } catch (err) {
         // Never let a registration failure be invisible. Finding 6.
         reportError(`registerTool(${def.name}) failed`, err);
