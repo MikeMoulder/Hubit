@@ -8,7 +8,7 @@ const mono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://hubit-store.vercel.app"),
-  title: "Hubit, desk and gear",
+  title: "Hubit",
   description:
     "A shop an agent can actually use. You set the rules, your agent does the browsing, and checkout is not a permission it can talk its way into: the tool is absent from its toolbox until you approve the basket.",
   openGraph: {

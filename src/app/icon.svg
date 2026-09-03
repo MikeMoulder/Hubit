@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <!-- Accent Gradient -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <!-- Glow Effect -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Rounded App Icon Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Tech Circuit Ring (Subtle) -->
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#334155" stroke-width="4" stroke-dasharray="12 8" />
+
+  <!-- Central Hub / Connection Nodes -->
+  <g transform="translate(256, 256)">
+    <!-- Node Connectors -->
+    <line x1="-80" y1="-80" x2="0" y2="0" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" />
+    <line x1="80" y1="-80" x2="0" y2="0" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" />
+    <line x1="-80" y1="80" x2="0" y2="0" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" />
+    <line x1="80" y1="80" x2="0" y2="0" stroke="url(#accentGrad)" stroke-width="12" stroke-linecap="round" />
+
+    <!-- Outer Nodes -->
+    <circle cx="-80" cy="-80" r="14" fill="#06b6d4" filter="url(#glow)" />
+    <circle cx="80" cy="-80" r="14" fill="#3b82f6" filter="url(#glow)" />
+    <circle cx="-80" cy="80" r="14" fill="#3b82f6" filter="url(#glow)" />
+    <circle cx="80" cy="80" r="14" fill="#06b6d4" filter="url(#glow)" />
+  </g>
+
+  <!-- Stylized "H" Monogram Core -->
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left vertical bar of H -->
+    <path d="M 176 156 L 176 356" />
+    <!-- Right vertical bar of H -->
+    <path d="M 336 156 L 336 356" />
+    <!-- Crossbar of H with central active hub dot -->
+    <path d="M 176 256 L 336 256" />
+  </g>
+
+  <!-- Center Hub Core (The 'It' Connection) -->
+  <circle cx="256" cy="256" r="22" fill="#ffffff" />
+  <circle cx="256" cy="256" r="10" fill="#06b6d4" />
+</svg>

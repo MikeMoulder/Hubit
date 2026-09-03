@@ -2,7 +2,7 @@
 
 **A storefront where you can hand an agent the shopping without handing it your wallet.** **`checkout`** **is not refused by a server. It is not in the agent's toolbox at all until you approve the basket.**
 
-[Live demo](https://hubit-store.vercel.app) · [Evaluation map](docs/evaluation-map.md) · [105-assertion capability audit](test/README.md) · [Runtime findings](docs/webmcp-findings.md) · [Technical decisions](docs/technical-decisions.md)
+[Live demo](https://hubit-store.vercel.app) · [Evaluation map](docs/evaluation-map.md) · [105-assertion capability audit](test/README.md) · [Runtime findings](docs/webmcp-findings.md) · [Technical decisions](docs/technical-decisions.md) · [Submission text](docs/submission-text.md)
 
 > **Open the demo in Chrome with** **`chrome://flags/#enable-webmcp-testing`** **enabled and restarted, or in ChatGPT's in-app browser.** Those are the only two browsers that expose `document.modelContext`. Anywhere else the store still works by hand, but the agent tool surface is empty and you are looking at the wrong half of the project.
 
