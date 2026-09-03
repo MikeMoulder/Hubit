@@ -418,7 +418,7 @@ const BASE_DEFS: ToolDef[] = [
   {
     name: "set_shipping_details",
     description:
-      "Fill in the shopper's delivery form. Pass any subset of the fields; anything you leave out keeps its current value. This types into the form the shopper is looking at, it does not place an order. Note that changing the address withdraws any approval already given, because the shopper approved a basket going to a particular place.",
+      "Fill in the shopper's delivery form. Pass any subset of the fields; anything you leave out keeps its current value. This types into the form and opens the cart drawer so the shopper watches it happen, it does not place an order. Note that changing the address withdraws any approval already given, because the shopper approved a basket going to a particular place.",
     inputSchema: {
       type: "object",
       properties: {
@@ -481,6 +481,14 @@ const BASE_DEFS: ToolDef[] = [
         return fail(`"${nextEmail}" is not a usable email address.`);
 
       store.setShipping(patch, "agent");
+
+      // Open the drawer the form lives in. Without this the agent types into a panel the
+      // shopper cannot see: the fields, their `agent` tags, and the approve button they
+      // are about to need are all inside CartDrawer, which renders only when cartOpen.
+      // Measured in the 2026-09-03 in-app-browser run, where the whole delivery beat
+      // happened off screen. Writing to someone's form is already a side effect; showing
+      // them the form it landed in is the honest completion of it, not an extra one.
+      store.setView({ cartOpen: true });
 
       const changed = Object.keys(patch).length;
       const missing = store.shippingMissing();
