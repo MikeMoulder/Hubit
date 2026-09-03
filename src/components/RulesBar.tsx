@@ -132,8 +132,17 @@ export function RulesBar() {
           </button>
 
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <GateStatus violations={v.length} approved={state.approved} live={live} />
-            {!state.pending && v.length === 0 && !state.approved && state.lines.length > 0 && (
+            <GateStatus
+              violations={v.length}
+              missingDelivery={store.shippingMissing(state).length}
+              approved={state.approved}
+              live={live}
+            />
+            {!state.pending &&
+              v.length === 0 &&
+              store.shippingMissing(state).length === 0 &&
+              !state.approved &&
+              state.lines.length > 0 && (
               <button
                 type="button"
                 data-audit="approve-basket"
@@ -275,12 +284,20 @@ export function RulesBar() {
   );
 }
 
+/**
+ * The gate has three conditions and this pill names whichever one is still open, in the
+ * order the shopper can act on them: fix the cart, then say where it goes, then approve.
+ * "Withheld" is always the word. Nothing here is ever phrased as the agent being denied,
+ * because the agent was never offered the tool in the first place.
+ */
 function GateStatus({
   violations,
+  missingDelivery,
   approved,
   live,
 }: {
   violations: number;
+  missingDelivery: number;
   approved: boolean;
   live: boolean;
 }) {
@@ -304,9 +321,11 @@ function GateStatus({
       <Lock className="size-3.5" aria-hidden />
       {violations
         ? "Rules not met, checkout withheld"
-        : approved
-          ? "Approved"
-          : "Checkout withheld until you approve"}
+        : missingDelivery
+          ? "No delivery address, checkout withheld"
+          : approved
+            ? "Approved"
+            : "Checkout withheld until you approve"}
     </span>
   );
 }

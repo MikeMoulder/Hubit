@@ -42,8 +42,10 @@
 
   results.push("=== SURFACE ===");
   const names = (await tools()).map((t) => t.name).sort();
-  check("13 tools at load, both conditional tools absent", names.join(","),
-    (a) => !a.includes("checkout") && !a.includes("get_order") && a.split(",").length === 13);
+  check("15 tools at load, both conditional tools absent", names.join(","),
+    (a) => !a.includes("checkout") && !a.includes("get_order") && a.split(",").length === 15);
+  check("set_shipping_details registered", names.join(","), has("set_shipping_details"));
+  check("get_shipping_details registered", names.join(","), has("get_shipping_details"));
   check("filter_catalog registered", names.join(","), has("filter_catalog"));
   check("focus_product registered", names.join(","), has("focus_product"));
   check("compare_products registered", names.join(","), has("compare_products"));
@@ -161,6 +163,53 @@
   const dearFirst = await call("search_products", { category: "monitor" });
   check("quality priority puts best first", dearFirst, (a) => a.indexOf("mon-ultra-34") < a.indexOf("mon-24-1080"));
 
+  results.push("=== THE DELIVERY FORM ===");
+  check("form starts empty", await call("get_shipping_details"), (a) => has("completely empty")(a) && has("STILL MISSING")(a));
+  check("no fields rejected", await call("set_shipping_details"), has("Nothing to set"));
+  check("bad email rejected", await call("set_shipping_details", { email: "ada-at-example" }), has("not a usable email"));
+  check("the bad email was NOT written to the form", await call("get_shipping_details"), (a) => !has("ada-at-example")(a));
+  check("non-string rejected", await call("set_shipping_details", { city: 42 }), has("must be a string"));
+  check("bad speed rejected", await call("set_shipping_details", { speed: "teleport" }), has("standard"));
+  check("partial fill reports what is left", await call("set_shipping_details", { full_name: "Ada Lovelace", email: "ada@example.com" }), has("Still missing"));
+  const filled = await call("set_shipping_details", {
+    line1: "12 Marconi Road", line2: "Flat 3", city: "Lagos",
+    postcode: "101233", country: "Nigeria", phone: "+234 800 000 0000",
+    notes: "Leave with the concierge.",
+  });
+  check("completing the form says so", filled, has("The form is complete"));
+  check("form reads back", await call("get_shipping_details"), (a) => has("Ada Lovelace")(a) && has("Marconi")(a) && has("no longer what is blocking")(a));
+
+  check("express is priced and counts against the budget", await call("set_shipping_details", { speed: "express" }), has("complete"));
+  await call("add_to_cart", { product_id: "mouse-light-wired" });
+  check("the cart shows delivery separately", await call("get_cart"), (a) => has("express delivery")(a) && has("Goods:")(a));
+  await call("set_shipping_details", { speed: "standard" });
+  check("back to free delivery", await call("get_cart"), (a) => !has("express delivery")(a));
+
+  results.push("=== the form is a REAL gate condition ===");
+  click("open cart", '[data-audit="open-cart"]');
+  await sleep(400);
+  check("the form is on the shopper's screen", (document.querySelector('[data-audit="ship-line1"]') || {}).value || "", has("Marconi"),
+    "the agent typed into the same input the human types into");
+  check("the form says which fields the agent filled", document.body.textContent, has("Your agent filled"),
+    "the split between what the human typed and what the agent typed is on screen");
+  click("close", '[data-audit="close-cart"]');
+  await sleep(300);
+
+  click("approve this basket", '[data-audit="approve-basket"]');
+  await sleep(500);
+  check("checkout REGISTERED with rules met, address complete, basket approved", (await get("checkout")) ? "present" : "absent", has("present"));
+  check("emptying a required field WITHHOLDS checkout", await (async () => {
+    await call("set_shipping_details", { country: "" });
+    await sleep(500);
+    return (await get("checkout")) ? "present" : "absent";
+  })(), has("absent"), "an order with nowhere to go is not a tool the agent should have");
+  await call("set_shipping_details", { country: "Nigeria" });
+  await sleep(500);
+  check("restoring it does NOT silently re-open checkout", (await get("checkout")) ? "present" : "absent", has("absent"),
+    "changing the address withdrew approval: the shopper has to say yes again");
+  await call("clear_cart");
+  await sleep(300);
+
   results.push("=== THE GATE ===");
   await call("add_to_cart", { product_id: "mon-ultra-34" });
   await call("add_to_cart", { product_id: "kb-mech-tkl" });
@@ -176,6 +225,7 @@
   check("approve click found", click("approve the change", '[data-audit="approve-change"]'), (a) => a === "true");
   await sleep(600);
   check("checkout REGISTERED after approval", (await get("checkout")) ? "present" : "absent", has("present"));
+  check("the delivery address was part of what opened it", await call("get_shipping_details"), has("no longer what is blocking"));
   check("agent can now check out", await call("checkout"), has("Order placed"));
   await sleep(700);
   check("checkout gone again after order", (await get("checkout")) ? "present" : "absent", has("absent"));
@@ -187,12 +237,16 @@
   check("reads back the total", placed, has("$1,284"));
   check("reads back what was bought", placed, (a) => has("chair-ergo-mesh")(a) && has("mon-ultra-34")(a));
   check("says checkout is closed", placed, has("cannot be placed twice"));
+  check("reads back where it shipped", placed, (a) => has("Marconi")(a) && has("Lagos")(a));
+  check("reads back the confirmation address", placed, has("ada@example.com"));
 
   results.push("=== APPROVAL IS PER BASKET ===");
   click("start over", '[data-audit="start-over"]');
   await sleep(400);
   check("get_order gone once the order is cleared", (await get("get_order")) ? "present" : "absent", has("absent"),
     "conditional in both directions, not a tool that appears once and sticks");
+  check("start over does NOT forget where you live", await call("get_shipping_details"), has("Ada Lovelace"),
+    "your address is not part of the basket you abandoned");
   await call("add_to_cart", { product_id: "mon-24-1080" });
   await sleep(200);
   click("approve this basket", '[data-audit="approve-basket"]');

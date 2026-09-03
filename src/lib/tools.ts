@@ -1,11 +1,11 @@
 import { CATALOG, byId, money } from "./catalog";
 import * as store from "./store";
-import type { Category, Product, ToolDef, ToolResult } from "./types";
+import type { Category, Product, Shipping, ToolDef, ToolResult } from "./types";
 
 /**
- * The fifteen tools ARE the API of this project. There are no HTTP endpoints.
+ * The seventeen tools ARE the API of this project. There are no HTTP endpoints.
  *
- * Thirteen are always on. TWO are conditional, in opposite directions, and that pair is
+ * Fifteen are always on. TWO are conditional, in opposite directions, and that pair is
  * the whole argument: `checkout` exists only while the shopper's rules are met and the
  * shopper has approved, and `get_order` exists only once an order has been placed. At
  * the moment the order lands, one tool leaves the agent's surface and the other arrives.
@@ -60,11 +60,17 @@ function cartSummary(): string {
     return `${l.qty}x ${p.name} (${p.id}) ${money(p.priceCents * l.qty)}`;
   });
   const total = store.cartTotalCents();
+  const delivery = store.shippingCostCents();
   const v = store.violations();
   const status = v.length
     ? `OVER: ${v.map((x) => x.message + (x.overByCents ? ` by ${money(x.overByCents)}` : "")).join("; ")}`
     : "Within all constraints.";
-  return `${rows.join("\n")}\nTotal: ${money(total)} of ${money(s.constraints.budgetCents)}. ${status}`;
+  // Report the number the budget is actually checked against, or an express order
+  // reads as comfortably under budget while the gate says the opposite.
+  const line = delivery
+    ? `Goods: ${money(total)} plus ${money(delivery)} express delivery. Total: ${money(total + delivery)} of ${money(s.constraints.budgetCents)}.`
+    : `Total: ${money(total)} of ${money(s.constraints.budgetCents)}.`;
+  return `${rows.join("\n")}\n${line} ${status}`;
 }
 
 /** Wraps execute so every call lands in the rail, including failures. */
@@ -99,7 +105,7 @@ function traced(def: ToolDef): ToolDef {
   };
 }
 
-// ── the thirteen always-on tools ─────────────────────────────────────────────
+// ── the fifteen always-on tools ──────────────────────────────────────────────
 
 const BASE_DEFS: ToolDef[] = [
   {
@@ -367,6 +373,129 @@ const BASE_DEFS: ToolDef[] = [
       return ok([header, ...lines, footer].join("\n"));
     },
   },
+  // ── the delivery form ──────────────────────────────────────────────────────
+  // Filling in a checkout form is the single most tedious thing a person does on a
+  // shopping site, and it is exactly the work worth handing to an agent. It is also
+  // the sharpest illustration of the split this project is about: the agent can type
+  // your address, and still cannot spend your money.
+  //
+  // An incomplete form withholds `checkout` the same way a broken budget does, so this
+  // is not a decorative panel bolted onto the demo. It is a third gate condition.
+  {
+    name: "get_shipping_details",
+    description:
+      "Read the delivery details currently on the form, and exactly which required fields are still blank. Call this before checkout: an incomplete form is one of the three reasons checkout will not be registered.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true },
+    execute: async () => {
+      const sh = store.getState().shipping;
+      const filled = [
+        sh.fullName && `Name: ${sh.fullName}`,
+        sh.email && `Email: ${sh.email}`,
+        sh.phone && `Phone: ${sh.phone}`,
+        sh.line1 && `Address: ${[sh.line1, sh.line2].filter(Boolean).join(", ")}`,
+        sh.city && `City: ${sh.city}`,
+        sh.postcode && `Postcode: ${sh.postcode}`,
+        sh.country && `Country: ${sh.country}`,
+        sh.notes && `Notes: ${sh.notes}`,
+      ].filter(Boolean) as string[];
+      const speed =
+        sh.speed === "express"
+          ? `Delivery: express, ${money(store.EXPRESS_CENTS)}, which counts against the budget.`
+          : "Delivery: standard, free.";
+      const missing = store.shippingMissing();
+      return ok(
+        [
+          filled.length ? filled.join("\n") : "The delivery form is completely empty.",
+          speed,
+          missing.length
+            ? `STILL MISSING: ${missing.join(", ")}. Checkout stays unregistered until these are filled.`
+            : "Every required field is filled. This is no longer what is blocking checkout.",
+        ].join("\n")
+      );
+    },
+  },
+  {
+    name: "set_shipping_details",
+    description:
+      "Fill in the shopper's delivery form. Pass any subset of the fields; anything you leave out keeps its current value. This types into the form the shopper is looking at, it does not place an order. Note that changing the address withdraws any approval already given, because the shopper approved a basket going to a particular place.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        full_name: { type: "string", description: "Who the parcel is addressed to" },
+        email: { type: "string", description: "For the order confirmation" },
+        phone: { type: "string", description: "Optional, for the courier" },
+        line1: { type: "string", description: "Street address" },
+        line2: { type: "string", description: "Optional. Flat, unit, building" },
+        city: { type: "string" },
+        postcode: { type: "string" },
+        country: { type: "string" },
+        speed: {
+          type: "string",
+          enum: ["standard", "express"],
+          description: "standard is free, express adds to the total and to the budget check",
+        },
+        notes: { type: "string", description: "Optional delivery instructions" },
+      },
+    },
+    execute: async (input) => {
+      // "speed" is deliberately not in here: it is the one field that is not free text.
+      const MAP: Array<[string, Exclude<keyof Shipping, "speed">]> = [
+        ["full_name", "fullName"],
+        ["email", "email"],
+        ["phone", "phone"],
+        ["line1", "line1"],
+        ["line2", "line2"],
+        ["city", "city"],
+        ["postcode", "postcode"],
+        ["country", "country"],
+        ["notes", "notes"],
+      ];
+
+      const patch: Partial<Shipping> = {};
+      const raw = obj(input);
+      for (const [key, field] of MAP) {
+        const v = raw[key];
+        if (v === undefined) continue;
+        // "" is allowed: it is how the agent clears a field it filled in wrongly.
+        if (typeof v !== "string") return fail(`${key} must be a string.`);
+        if (v.length > 120) return fail(`${key} is too long: 120 characters at most.`);
+        patch[field] = v.trim();
+      }
+
+      const speed = raw["speed"];
+      if (speed !== undefined) {
+        if (typeof speed !== "string" || (speed !== "standard" && speed !== "express"))
+          return fail('speed must be "standard" or "express".');
+        patch.speed = speed;
+      }
+
+      if (!Object.keys(patch).length)
+        return fail(
+          "Nothing to set. Pass at least one of: full_name, email, phone, line1, line2, city, postcode, country, speed, notes."
+        );
+
+      // Validate BEFORE writing, so a bad email never lands on the shopper's screen.
+      const nextEmail = patch.email !== undefined ? patch.email : store.getState().shipping.email;
+      if (nextEmail && !store.EMAIL_OK(nextEmail))
+        return fail(`"${nextEmail}" is not a usable email address.`);
+
+      store.setShipping(patch, "agent");
+
+      const changed = Object.keys(patch).length;
+      const missing = store.shippingMissing();
+      const v = store.violations();
+      const tail = missing.length
+        ? `Still missing: ${missing.join(", ")}.`
+        : v.length
+          ? "The form is complete. The cart is still outside the shopper's rules, so checkout stays unregistered."
+          : "The form is complete. All that is left is for the shopper to approve the basket.";
+      return ok(
+        `Updated ${changed} field${changed === 1 ? "" : "s"} on the shopper's delivery form. ${tail}`
+      );
+    },
+  },
+
   // ── tools that move the HUMAN's screen ─────────────────────────────────────
   // Everything above answers the agent. These two run the other direction: the agent
   // changing what the shopper is looking at, so a person watching can follow the
@@ -457,13 +586,14 @@ let placing = false;
 export const CHECKOUT_TOOL: ToolDef = traced({
   name: "checkout",
   description:
-    "Place the order for everything in the cart. Only available while the cart satisfies the shopper's rules AND the shopper has approved this basket.",
+    "Place the order for everything in the cart, to the address on the delivery form. Only available while the cart satisfies the shopper's rules, the delivery form is complete, AND the shopper has approved this basket.",
   inputSchema: { type: "object", properties: {} },
   execute: async () => {
     if (placing) return fail("An order is already being placed.");
     if (!store.checkoutLive()) return fail("Checkout is not currently permitted.");
     placing = true;
-    const total = store.cartTotalCents();
+    const total = store.orderTotalCents();
+    const to = store.getState().shipping;
 
     // Placing the order makes checkoutLive false, which aborts THIS tool. Aborting a
     // call that is still in flight rejects it, so the agent would see an error on a
@@ -476,7 +606,9 @@ export const CHECKOUT_TOOL: ToolDef = traced({
       placing = false;
     }, 350);
 
-    return ok(`Order placed. ${money(total)} charged. Thanks.`);
+    return ok(
+      `Order placed. ${money(total)} charged, going to ${to.fullName}, ${to.line1}, ${to.city} ${to.postcode}, ${to.country}. Confirmation to ${to.email}. Thanks.`
+    );
   },
 });
 
@@ -504,10 +636,13 @@ export const ORDER_TOOL: ToolDef = traced({
       return `${l.qty}x ${p ? p.name : l.productId} (${l.productId})`;
     });
     const when = new Date(s.order.at).toLocaleTimeString();
+    const to = s.order.shipping;
     return ok(
       [
         `Order placed at ${when}. Total ${money(s.order.total)}.`,
         ...rows,
+        `Shipping to ${to.fullName}, ${[to.line1, to.line2].filter(Boolean).join(", ")}, ${to.city} ${to.postcode}, ${to.country}, ${to.speed}.`,
+        `Confirmation went to ${to.email}.`,
         "Checkout is closed for this basket: the order is done and cannot be placed twice.",
       ].join("\n")
     );

@@ -31,6 +31,41 @@ export type Constraints = {
   priority: "quality" | "price";
 };
 
+/**
+ * Where the order goes. Filled by the shopper OR by the agent through
+ * set_shipping_details, which is the point: handing over the tedious part of a checkout
+ * is exactly the work you want an agent to do, and it is still not the same thing as
+ * handing over permission to pay.
+ *
+ * Nothing here is persisted or transmitted. There is no backend to send it to.
+ */
+export type Shipping = {
+  fullName: string;
+  email: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  postcode: string;
+  country: string;
+  speed: ShippingSpeed;
+  notes: string;
+};
+
+export type ShippingSpeed = "standard" | "express";
+
+/** The fields an order cannot go out without. line2, phone and notes are optional. */
+export const SHIPPING_REQUIRED = [
+  "fullName",
+  "email",
+  "line1",
+  "city",
+  "postcode",
+  "country",
+] as const;
+
+export type ShippingField = keyof Shipping;
+
 export type Violation = {
   field: keyof Constraints;
   message: string;

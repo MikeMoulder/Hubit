@@ -1,5 +1,13 @@
 import { CATALOG, byId } from "./catalog";
-import type { CartLine, Category, Constraints, Proposal, Violation } from "./types";
+import type {
+  CartLine,
+  Category,
+  Constraints,
+  Proposal,
+  Shipping,
+  Violation,
+} from "./types";
+import { SHIPPING_REQUIRED } from "./types";
 
 /**
  * Vanilla store, not React state. Tool `execute` callbacks run outside React and
@@ -37,9 +45,12 @@ export type State = {
   /** Human granted permission to check out. Reset whenever the cart or rules change. */
   approved: boolean;
   pending: Proposal | null;
+  shipping: Shipping;
+  /** Which delivery fields the AGENT typed, so the form can show the split on screen. */
+  shippingBy: Partial<Record<keyof Shipping, "agent">>;
   /** Snapshot, not a pointer at the cart: `get_order` must keep reading the same
    *  order even after the shopper starts filling the basket again. */
-  order: { total: number; at: number; lines: CartLine[] } | null;
+  order: { total: number; at: number; lines: CartLine[]; shipping: Shipping } | null;
   view: View;
   calls: ToolCall[];
   seamErrors: string[];
@@ -50,6 +61,19 @@ const initial: State = {
   constraints: { budgetCents: 120000, have: [], priority: "quality" },
   approved: false,
   pending: null,
+  shipping: {
+    fullName: "",
+    email: "",
+    phone: "",
+    line1: "",
+    line2: "",
+    city: "",
+    postcode: "",
+    country: "",
+    speed: "standard",
+    notes: "",
+  },
+  shippingBy: {},
   order: null,
   view: { category: "all", query: "", cartOpen: false, quickView: null },
   calls: [],
@@ -75,10 +99,51 @@ export function cartTotalCents(s: State = state): number {
   return s.lines.reduce((sum, l) => sum + (byId(l.productId)?.priceCents ?? 0) * l.qty, 0);
 }
 
+/** Express is a real cost, so it counts against the budget like everything else. */
+export const EXPRESS_CENTS = 1499;
+
+export function shippingCostCents(s: State = state): number {
+  return s.shipping.speed === "express" ? EXPRESS_CENTS : 0;
+}
+
+/** Goods plus delivery. This, not the goods total, is what the budget is checked against. */
+export function orderTotalCents(s: State = state): number {
+  return cartTotalCents(s) + shippingCostCents(s);
+}
+
+const LABELS: Record<string, string> = {
+  fullName: "full name",
+  email: "email",
+  line1: "address line 1",
+  city: "city",
+  postcode: "postcode",
+  country: "country",
+};
+
+/** Rough on purpose. It rejects the obvious mistakes without inventing an RFC. */
+export const EMAIL_OK = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+
+/**
+ * What the delivery form is still missing, in human words. Empty means the order can
+ * physically go out, which is one of the three things checkout needs.
+ */
+export function shippingMissing(s: State = state): string[] {
+  const out: string[] = [];
+  for (const f of SHIPPING_REQUIRED) {
+    if (!String(s.shipping[f]).trim()) out.push(LABELS[f]);
+  }
+  if (s.shipping.email.trim() && !EMAIL_OK(s.shipping.email)) out.push("a valid email");
+  return out;
+}
+
+export function shippingComplete(s: State = state): boolean {
+  return shippingMissing(s).length === 0;
+}
+
 /** Recomputed on every mutation. Never stored. */
 export function violations(s: State = state): Violation[] {
   const out: Violation[] = [];
-  const total = cartTotalCents(s);
+  const total = orderTotalCents(s);
   if (total > s.constraints.budgetCents) {
     out.push({
       field: "budgetCents",
@@ -95,9 +160,18 @@ export function violations(s: State = state): Violation[] {
   return out;
 }
 
-/** The gate. One boolean. Everything on screen is derived from it. */
+/**
+ * The gate. One boolean. Everything on screen is derived from it.
+ *
+ * THREE conditions, and each one is visible on the page: the cart is inside the
+ * shopper's rules, the order has somewhere to go, and the shopper has approved THIS
+ * basket. A missing delivery address withholds checkout exactly the way a broken budget
+ * does, because a tool that cannot be completed should not be on the agent's surface.
+ */
 export function checkoutLive(s: State = state): boolean {
-  return violations(s).length === 0 && s.approved && s.order === null;
+  return (
+    violations(s).length === 0 && shippingComplete(s) && s.approved && s.order === null
+  );
 }
 
 // ── actions ──────────────────────────────────────────────────────────────────
@@ -131,6 +205,26 @@ export function updateQuantity(productId: string, qty: number) {
       lines: state.lines.map((l) => (l.productId === productId ? { ...l, qty } : l)),
     })
   );
+}
+
+/**
+ * Delivery details, written by the shopper's keyboard or by the agent's
+ * set_shipping_details. Both land here, which is the honest version: there is no
+ * separate agent path.
+ *
+ * It goes through invalidateApproval deliberately. You approved a basket going to a
+ * particular address, so changing the address afterwards has to ask you again — an
+ * agent must not be able to redirect a parcel you already said yes to.
+ */
+export function setShipping(patch: Partial<Shipping>, by: "human" | "agent" = "human") {
+  // Provenance per field, not per form: the interesting picture is the one where the
+  // agent filled six fields and the shopper corrected one of them.
+  const shippingBy = { ...state.shippingBy };
+  for (const k of Object.keys(patch) as (keyof Shipping)[]) {
+    if (by === "agent") shippingBy[k] = "agent";
+    else delete shippingBy[k];
+  }
+  set(invalidateApproval({ shipping: { ...state.shipping, ...patch }, shippingBy }));
 }
 
 /**
@@ -184,11 +278,23 @@ export function revokeApproval() {
 }
 
 export function placeOrder() {
-  set({ order: { total: cartTotalCents(), at: Date.now(), lines: state.lines }, approved: false });
+  set({
+    order: {
+      total: orderTotalCents(),
+      at: Date.now(),
+      lines: state.lines,
+      shipping: state.shipping,
+    },
+    approved: false,
+  });
 }
 
+/**
+ * Start over empties the basket. It deliberately keeps `calls` AND `shipping`: the log
+ * is evidence, and where you live is not part of the basket you just abandoned.
+ */
 export function reset() {
-  set({ ...initial, calls: state.calls });
+  set({ ...initial, calls: state.calls, shipping: state.shipping, shippingBy: state.shippingBy });
 }
 
 let callId = 0;
