@@ -61,7 +61,11 @@ export function RulesBar() {
             <label htmlFor="budget" className="text-xs font-medium">
               Budget
             </label>
-            <div className="flex items-center rounded-full border border-[var(--color-border)] px-2.5 py-1 transition-colors focus-within:border-[var(--color-accent)] hover:border-[var(--color-border-strong)]">
+            {/* The wrapper owns the focus state for the input inside it. See globals.css. */}
+            <div
+              data-focus-host
+              className="flex items-center rounded-full border border-[var(--color-border)] px-2.5 py-1 transition-colors focus-within:border-[var(--color-accent)] focus-within:ring-2 focus-within:ring-[var(--color-accent-soft)] hover:border-[var(--color-border-strong)]"
+            >
               <span className="text-sm text-[var(--color-muted)]">$</span>
               <input
                 id="budget"

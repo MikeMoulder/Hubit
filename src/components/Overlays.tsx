@@ -362,7 +362,7 @@ function Field({
         onChange={(e) => store.setShipping({ [name]: e.target.value })}
         className={[
           "mt-1 w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface-2)] px-2.5 py-1.5 text-sm transition-colors",
-          "placeholder:text-[var(--color-muted)] focus:bg-[var(--color-surface)] focus:outline-none",
+          "placeholder:text-[var(--color-muted)] focus:bg-[var(--color-surface)]",
           byAgent
             ? "border-[var(--color-accent)]"
             : empty

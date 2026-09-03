@@ -69,6 +69,28 @@ body {
   border-radius: 4px;
 }
 
+/*
+ * Some inputs sit inside a wrapper that already draws the focus state for them, like
+ * the budget pill. The rule above ties with `outline-none` on specificity and wins on
+ * source order, so the input drew a second rectangle inside the pill. Suppress the
+ * inner ring ONLY where a wrapper has taken responsibility for showing focus, marked
+ * with data-focus-host. Never by dropping focus feedback altogether.
+ */
+[data-focus-host] :where(input):focus-visible {
+  outline: none;
+}
+
+/* The budget is a pill. Chrome's spinner arrows do not belong inside one. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
