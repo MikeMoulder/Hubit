@@ -18,7 +18,7 @@ import { useToolRows, useRuntime, useStore } from "@/lib/useHubit";
  * the same beat that `checkout` stops drawing, which is the point of having both.
  *
  * Rendered entirely from OUR registry via useToolRows. Never from `toolchange`,
- * which does not exist in ChatGPT's in-app browser (probe/FINDINGS.md finding 3).
+ * which does not exist in ChatGPT's in-app browser (docs/webmcp-findings.md finding 3).
  */
 export function ToolRail() {
   const rows = useToolRows();

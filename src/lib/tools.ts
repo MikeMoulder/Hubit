@@ -10,7 +10,7 @@ import type { Category, Product, Shipping, ToolDef, ToolResult } from "./types";
  * shopper has approved, and `get_order` exists only once an order has been placed. At
  * the moment the order lands, one tool leaves the agent's surface and the other arrives.
  *
- * `inputSchema` does NOT validate (probe/FINDINGS.md finding 4), so every tool
+ * `inputSchema` does NOT validate (docs/webmcp-findings.md finding 4), so every tool
  * validates its own arguments and returns failures as content rather than throwing:
  * a thrown error reaches the agent as a generic message it cannot act on.
  */
@@ -578,7 +578,7 @@ export const BASE_TOOLS: ToolDef[] = BASE_DEFS.map(traced);
 
 /**
  * Registered ONLY while `checkoutLive` is true. Its ABSENCE is the product: there is
- * nothing for the agent to retry or argue with. Confirmed sound in probe/FINDINGS.md:
+ * nothing for the agent to retry or argue with. Confirmed sound in docs/webmcp-findings.md:
  * after abort() a stale handle is rejected on call.
  */
 let placing = false;
@@ -598,7 +598,7 @@ export const CHECKOUT_TOOL: ToolDef = traced({
     // Placing the order makes checkoutLive false, which aborts THIS tool. Aborting a
     // call that is still in flight rejects it, so the agent would see an error on a
     // successful order. A 0ms defer is NOT enough: it fires in the gap before the
-    // result crosses the WebMCP boundary. Measured, see probe/FINDINGS.md.
+    // result crosses the WebMCP boundary. Measured, see docs/webmcp-findings.md.
     // Revocation for every OTHER reason (budget change, withdrawn approval) stays
     // immediate, which is what the demo shows.
     setTimeout(() => {

@@ -1,7 +1,7 @@
 /**
  * THE SEAM. The only file in this project that touches `document.modelContext`.
  *
- * Every fact encoded here was measured on 2026-09-02, see ../../probe/FINDINGS.md:
+ * Every fact encoded here was measured on 2026-09-02, see docs/webmcp-findings.md:
  *
  *  1. Late registration works. A tool registered seconds after load lands in the
  *     registry and executes, in Chrome 152 AND in ChatGPT's in-app browser.

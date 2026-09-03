@@ -15,7 +15,7 @@ export function useStore(): store.State {
  *
  * Order matters: base tools register FIRST, before anything optional runs. An
  * unguarded call ahead of registration once produced a page with zero tools and no
- * visible error (probe/FINDINGS.md finding 6).
+ * visible error (docs/webmcp-findings.md finding 6).
  */
 export function useToolSurface() {
   const state = useStore();

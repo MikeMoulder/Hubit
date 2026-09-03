@@ -1,4 +1,4 @@
-const EXPR = require('fs').readFileSync(__dirname + '/' + (process.env.CDP_EXPR || 'expr2.js'), 'utf8');
+const EXPR = require('fs').readFileSync(__dirname + '/' + (process.env.CDP_EXPR || 'capability-audit.js'), 'utf8');
 const PORT = process.env.CDP_PORT || 9223;
 const WAIT = Number(process.env.CDP_WAIT || 8000); // must exceed the 5s late registration
 
@@ -13,7 +13,7 @@ const WAIT = Number(process.env.CDP_WAIT || 8000); // must exceed the 5s late re
   ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); } };
 
   await send('Page.enable');
-  await send('Page.navigate', { url: (process.env.CDP_URL || 'http://localhost:8791/') + '?t=' + Date.now() });
+  await send('Page.navigate', { url: (process.env.CDP_URL || 'http://localhost:3000/') + '?t=' + Date.now() });
   await new Promise(r => setTimeout(r, WAIT)); // let the 5s late registration land
 
   const r = await send('Runtime.evaluate', { expression: EXPR, awaitPromise: true, returnByValue: true });
