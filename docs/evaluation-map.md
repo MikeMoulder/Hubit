@@ -73,7 +73,7 @@ recorded next to the code that depends on it.
 ## Evidence
 
 `test/capability-audit.js` is **105 assertions driven through the real
-`document.modelContext.executeTool` path** in flagged Chrome — not unit tests, and not
+`document.modelContext.executeTool` path** in flagged Chrome, not unit tests, and not
 against the tools' own return values. The screen-moving tools are asserted against the
 DOM, and the gate is driven by clicking the actual approve button.
 

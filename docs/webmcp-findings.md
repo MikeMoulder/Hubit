@@ -23,7 +23,7 @@ accepted with no error and no flag needed.
 This is what Hubit's central beat depends on: `checkout` appearing at the moment the
 shopper approves, in a session that is already running.
 
-## 2. `AbortSignal` teardown is sound — the property the whole project rests on
+## 2. `AbortSignal` teardown is sound: the property the whole project rests on
 
 After `controller.abort()`:
 
@@ -41,7 +41,7 @@ Implemented at `src/lib/webmcp.ts:114`.
 
 ## 3. `toolchange` is not usable, and nothing may render from it
 
-In Chrome, `toolchange` fires on `document.modelContext` — **not** on `document`.
+In Chrome, `toolchange` fires on `document.modelContext`, **not** on `document`.
 Measured: `document` fired 0 events, `modelContext` fired 2, one per registry mutation.
 Listening on `document`, which is the intuitive guess, yields silence and a tool rail
 that never updates.
@@ -62,7 +62,7 @@ enforce them: arguments arrive at `execute` exactly as the caller sent them, inc
 missing keys, wrong types and out-of-range numbers.
 
 Every tool in `src/lib/tools.ts` therefore hand-validates and returns failures as content
-with `isError`, rather than throwing — a thrown error reaches the agent as a generic
+with `isError`, rather than throwing: a thrown error reaches the agent as a generic
 message it cannot act on. The capability audit asserts this on every tool: missing
 arguments, wrong types, out-of-range values, unknown ids and string coercion.
 
@@ -86,7 +86,7 @@ drives. There is no simulated path anywhere in this build.
 ## 6. Register first, and never let a throw be invisible
 
 An unguarded call placed *before* tool registration once produced a page with zero tools
-and no visible error — which looked exactly like "this runtime does not support WebMCP".
+and no visible error, which looked exactly like "this runtime does not support WebMCP".
 It was our own bug, and we nearly recorded it as a finding.
 
 Two rules came out of it, both still enforced:
@@ -104,7 +104,7 @@ it printed one red unhandled rejection per tool on every gate change.
 
 ## A tool must not unregister itself synchronously inside its own call
 
-`checkout` places the order, which closes the gate, which aborts `checkout` — while it is
+`checkout` places the order, which closes the gate, which aborts `checkout`, while it is
 still running. Aborting an in-flight call rejects it, so the agent sees an error on an
 order that actually succeeded.
 
@@ -128,7 +128,7 @@ Driven over CDP against a production build:
 8. human approves the change            -> checkout REGISTERED
 ```
 
-The full capability audit — **105 assertions, 105 passed, 0 failed** — has been run both
+The full capability audit (**105 assertions, 105 passed, 0 failed**) has been run both
 locally and against the deployed URL, through the real `document.modelContext.executeTool`
 path. See `test/README.md`.
 

@@ -17,7 +17,7 @@ says so. Something has to enforce that.
 (`src/lib/useHubit.ts:20`). It is absent from the agent's toolbox, not present and
 refusing.
 
-**Tradeoff.** A refusal is easier to explain to a model — it gets a message telling it
+**Tradeoff.** A refusal is easier to explain to a model: it gets a message telling it
 what to fix. Absence gives it nothing to read. We accepted that because a refused tool is
 still a tool the agent can retry, log, or argue with, and because the security property
 is then only as good as the check inside the handler. Absence is enforced by the runtime:
@@ -54,7 +54,7 @@ a Chrome-only cross-check, and nothing renders from it.
 
 **Tradeoff.** We duplicate state the browser already holds, and it can in principle drift
 from the browser's own registry. We took it because `document.modelContext` is **not an
-EventTarget in ChatGPT's in-app browser** — `addEventListener` throws `TypeError` and
+EventTarget in ChatGPT's in-app browser**: `addEventListener` throws `TypeError` and
 zero events fire for an entire run (`docs/webmcp-findings.md`). Any design that repaints
 on `toolchange` renders a permanently frozen rail on one of the two runtimes this is
 judged in.
@@ -65,7 +65,7 @@ judged in.
 while the gate is open, `get_order` only once an order exists.
 
 **Alternatives considered.** Register the base tools once, then add and remove the two
-conditional tools through their own separate effects — fewer registration calls and less
+conditional tools through their own separate effects, fewer registration calls and less
 churn.
 
 **Chosen.** One effect rebuilds the entire surface as a function of the gate
@@ -80,7 +80,7 @@ waste is invisible at seventeen tools.
 ## 5. Defer the state change that unregisters the running tool
 
 **Context.** `checkout` places the order. Placing the order closes the gate, which
-unregisters `checkout` — while `checkout` is still executing.
+unregisters `checkout`, while `checkout` is still executing.
 
 **Alternatives considered.**
 - Let it happen. Simplest, and the order really is placed.
@@ -88,10 +88,10 @@ unregisters `checkout` — while `checkout` is still executing.
 
 **Chosen.** Defer the state change by 350ms (`src/lib/tools.ts:586`).
 
-**Tradeoff.** A magic number, and 350ms of window in which `checkout` is still callable —
+**Tradeoff.** A magic number, and 350ms of window in which `checkout` is still callable,
 guarded by a `placing` flag so a second call cannot double-order. We took it because
 aborting a call that is still in flight *rejects it*, so the agent sees an error on an
 order that actually succeeded. `0ms` was measured to be insufficient: it fires in the gap
-before the result crosses the WebMCP boundary. Revocation for every other reason — budget
-change, withdrawn approval, edited address — stays immediate, which is the behaviour the
+before the result crosses the WebMCP boundary. Revocation for every other reason (budget
+change, withdrawn approval, edited address) stays immediate, which is the behaviour the
 demo depends on.
