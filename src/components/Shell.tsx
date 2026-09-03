@@ -150,21 +150,15 @@ export function SiteFooter({
 }: {
   onCategory: (c: Category | "all") => void;
 }) {
-  const steps = [
-    "Set a budget and say what you already own",
-    "Ask your agent to build the setup",
-    "Watch the cart fill against your rules",
-    "Approve the basket, or withdraw at any point",
-  ];
-
   return (
     <footer className="mt-14 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="mx-auto grid max-w-[1400px] gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.2fr_1.3fr]">
+      <div className="mx-auto grid max-w-[1400px] gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.3fr]">
         <div>
           <p className="text-base font-semibold tracking-[-0.02em]">Hubit</p>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-[var(--color-muted)]">
-            Desk gear for people who would rather their agent did the shopping. You set
-            the budget, it does the browsing, and it cannot check out until you say so.
+            A desk and gadget shop. Keyboards, monitors, audio, lighting, chargers and
+            the small hardware that makes a desk worth sitting at. Picked one at a time,
+            priced plainly, and kept in stock.
           </p>
         </div>
 
@@ -189,18 +183,6 @@ export function SiteFooter({
             ))}
           </ul>
         </nav>
-
-        <div>
-          <h2 className="text-sm font-semibold">How this works</h2>
-          <ol className="mt-3 space-y-2">
-            {steps.map((s, i) => (
-              <li key={s} className="flex gap-2.5 text-sm text-[var(--color-muted)]">
-                <span className="shrink-0 tabular-nums opacity-50">{i + 1}</span>
-                <span>{s}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
 
         <div>
           <h2 className="text-sm font-semibold">Open source</h2>
