@@ -34,7 +34,10 @@ const HAVE_LABEL: Record<(typeof CATEGORIES)[number], string> = {
  */
 export function RulesBar() {
   const state = useStore();
-  const [open, setOpen] = useState(false);
+  // Open by default. These are the shopper's rules, not an advanced setting, and a
+  // judge landing cold should see what the agent is shopping against without hunting
+  // for it. The collapse is there for anyone who wants the room back.
+  const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState<string | null>(null);
 
   const v = store.violations(state);
