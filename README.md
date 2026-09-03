@@ -116,10 +116,13 @@ Inside it, a `Host` class keeps **our own registry** alongside the browser's, an
 const controller = new AbortController();
 this.entries.set(def.name, { def, controller });
 
-this.mc.registerTool(
-  { name, description, inputSchema, annotations, execute },
-  { signal: controller.signal }
-);
+document.modelContext.registerTool({
+  name: def.name,
+  description: def.description,
+  inputSchema: def.inputSchema,
+  ...(def.annotations ? { annotations: def.annotations } : {}),
+  execute: async (input: unknown) => def.execute(input),
+}, { signal: controller.signal });
 
 return () => {
   controller.abort();          // the real revocation, not a UI flag
@@ -127,6 +130,8 @@ return () => {
   this.emit();
 };
 ```
+
+That is the call verbatim, not a paraphrase — `document.modelContext.registerTool({…})` is written out at the call site rather than through a cached `this.mc` alias, so the API the page actually drives is the one you can grep for. Presence is a runtime question, answered by a feature test before the call is reached; `Document.modelContext` is declared in the same file so the call needs no `!` and no cast.
 
 `registerTool` in Chrome 152 returns a promise that **rejects with** **`AbortError`** the instant the signal fires. That rejection *is* the revocation working. Left unhandled it printed one red `unhandledRejection` per tool on every gate change, which is precisely the moment the demo is recording. So it is swallowed when `controller.signal.aborted` is true, and still surfaced when it is not, because a genuine registration failure must never be invisible.
 

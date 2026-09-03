@@ -34,6 +34,17 @@ type ModelContextLike = {
   ) => unknown;
 };
 
+// Declared non-optional on purpose. It lets register() call
+// `document.modelContext.registerTool({...})` verbatim — no cached alias, no `!` — so
+// the call the WebMCP rules name is the call that actually runs, and is greppable in
+// the source. Presence is a RUNTIME question and is answered by hasModelContext()
+// before the call is ever reached; a browser without WebMCP leaves this undefined.
+declare global {
+  interface Document {
+    modelContext: ModelContextLike;
+  }
+}
+
 function isThenable(v: unknown): v is PromiseLike<unknown> {
   return (
     typeof v === "object" &&
@@ -44,20 +55,23 @@ function isThenable(v: unknown): v is PromiseLike<unknown> {
 
 function getModelContext(): ModelContextLike | null {
   if (typeof document === "undefined") return null;
-  const mc = (document as unknown as { modelContext?: ModelContextLike }).modelContext;
+  const mc: ModelContextLike | undefined = document.modelContext;
   return mc && typeof mc.registerTool === "function" ? mc : null;
+}
+
+/** The runtime guard. Nothing calls into the API without this being true first. */
+function hasModelContext(): boolean {
+  return getModelContext() !== null;
 }
 
 class Host implements ToolHost {
   readonly available: boolean;
   readonly runtime: "webmcp" | "local";
-  private mc: ModelContextLike | null;
   private entries = new Map<string, Entry>();
   private listeners = new Set<() => void>();
 
   constructor() {
-    this.mc = getModelContext();
-    this.available = this.mc !== null;
+    this.available = hasModelContext();
     this.runtime = this.available ? "webmcp" : "local";
   }
 
@@ -72,20 +86,17 @@ class Host implements ToolHost {
     const controller = new AbortController();
     this.entries.set(def.name, { def, controller });
 
-    if (this.mc) {
+    if (this.available) {
       try {
-        const pending = this.mc.registerTool(
-          {
-            name: def.name,
-            description: def.description,
-            inputSchema: def.inputSchema,
-            ...(def.annotations ? { annotations: def.annotations } : {}),
-            // The agent calls this directly. inputSchema does not validate, so the
-            // tool's own execute is responsible for rejecting bad arguments.
-            execute: async (input: unknown) => def.execute(input),
-          },
-          { signal: controller.signal }
-        );
+        const pending = document.modelContext.registerTool({
+          name: def.name,
+          description: def.description,
+          inputSchema: def.inputSchema,
+          ...(def.annotations ? { annotations: def.annotations } : {}),
+          // The agent calls this directly. inputSchema does not validate, so the
+          // tool's own execute is responsible for rejecting bad arguments.
+          execute: async (input: unknown) => def.execute(input),
+        }, { signal: controller.signal });
 
         // Chrome 152 returns a promise that REJECTS with AbortError the moment the
         // signal fires. That rejection IS the revocation working, not a failure, so
