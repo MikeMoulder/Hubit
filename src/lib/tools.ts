@@ -3,7 +3,12 @@ import * as store from "./store";
 import type { Category, Product, ToolDef, ToolResult } from "./types";
 
 /**
- * The eleven tools ARE the API of this project. There are no HTTP endpoints.
+ * The fifteen tools ARE the API of this project. There are no HTTP endpoints.
+ *
+ * Thirteen are always on. TWO are conditional, in opposite directions, and that pair is
+ * the whole argument: `checkout` exists only while the shopper's rules are met and the
+ * shopper has approved, and `get_order` exists only once an order has been placed. At
+ * the moment the order lands, one tool leaves the agent's surface and the other arrives.
  *
  * `inputSchema` does NOT validate (probe/FINDINGS.md finding 4), so every tool
  * validates its own arguments and returns failures as content rather than throwing:
@@ -94,7 +99,7 @@ function traced(def: ToolDef): ToolDef {
   };
 }
 
-// ── the ten always-on tools ──────────────────────────────────────────────────
+// ── the thirteen always-on tools ─────────────────────────────────────────────
 
 const BASE_DEFS: ToolDef[] = [
   {
@@ -227,6 +232,18 @@ const BASE_DEFS: ToolDef[] = [
     },
   },
   {
+    name: "clear_cart",
+    description:
+      "Empty the cart completely. Like every other change to the basket, this withdraws the shopper's approval.",
+    inputSchema: { type: "object", properties: {} },
+    execute: async () => {
+      const n = store.getState().lines.length;
+      if (!n) return ok("Cart is already empty.");
+      store.clearCart();
+      return ok(`Cleared ${n} line${n === 1 ? "" : "s"}. Cart is empty.`);
+    },
+  },
+  {
     name: "propose_constraint_change",
     description:
       "Ask the shopper to change one of their rules. This does NOT change anything by itself: it queues a proposal that the shopper must approve or reject. Use this when the cart cannot satisfy the current rules.",
@@ -350,11 +367,85 @@ const BASE_DEFS: ToolDef[] = [
       return ok([header, ...lines, footer].join("\n"));
     },
   },
+  // ── tools that move the HUMAN's screen ─────────────────────────────────────
+  // Everything above answers the agent. These two run the other direction: the agent
+  // changing what the shopper is looking at, so a person watching can follow the
+  // reasoning instead of finding out what happened once the cart total moves. Neither
+  // is readOnlyHint. Changing someone's screen is a side effect, and marking it
+  // read-only would lie to whatever is deciding which tools are safe to call.
+  {
+    name: "filter_catalog",
+    description:
+      "Change what the shopper sees on screen: filter the shelf to a category and/or a search term. This does NOT return products, it moves the human's view. Use search_products to read the catalog, and use this to show the shopper where you are looking before you add anything. Pass an empty query to clear the search.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: [...CATEGORIES, "all"],
+          description: 'A category, or "all" for the whole shelf',
+        },
+        query: { type: "string", description: "Search term. An empty string clears it." },
+      },
+    },
+    execute: async (input) => {
+      const category = str(input, "category");
+      // `query` is read raw rather than through str(): "" is a meaningful value here,
+      // it is how the agent clears a search, and str() treats empty as absent.
+      const rawQuery = obj(input)["query"];
+      if (rawQuery !== undefined && typeof rawQuery !== "string")
+        return fail("query must be a string.");
+      const query = typeof rawQuery === "string" ? rawQuery.trim() : null;
+
+      if (category && category !== "all" && !CATEGORIES.includes(category as Category))
+        return fail(`Unknown category "${category}". Valid: ${CATEGORIES.join(", ")}, all.`);
+      if (!category && query === null)
+        return fail("Pass a category, a query, or both. There is nothing to change otherwise.");
+
+      const next: Partial<store.View> = {};
+      if (category) next.category = category as Category | "all";
+      if (query !== null) next.query = query;
+      store.setView(next);
+
+      // Count what the shopper can now see, by the same rule the grid uses.
+      const v = store.getState().view;
+      const q = v.query.toLowerCase();
+      const shown = CATALOG.filter((p) => {
+        if (v.category !== "all" && p.category !== v.category) return false;
+        if (q && !`${p.name} ${p.description}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+      const where = v.category === "all" ? "the whole shelf" : `${v.category}s`;
+      return ok(
+        `The shopper is now looking at ${where}${v.query ? ` matching "${v.query}"` : ""}: ` +
+          `${shown.length} product${shown.length === 1 ? "" : "s"} on screen.`
+      );
+    },
+  },
+  {
+    name: "focus_product",
+    description:
+      "Open one product's quick view on the shopper's screen, so they can see what you are considering before you add it. Call with no product_id to close it again.",
+    inputSchema: {
+      type: "object",
+      properties: { product_id: { type: "string", description: "Omit to close the quick view" } },
+    },
+    execute: async (input) => {
+      const id = str(input, "product_id");
+      if (!id) {
+        store.setView({ quickView: null });
+        return ok("Closed the quick view.");
+      }
+      if (!byId(id)) return fail(`No product with id "${id}".`);
+      store.setView({ quickView: id });
+      return ok(`Showing the shopper ${describe(id)}`);
+    },
+  },
 ];
 
 export const BASE_TOOLS: ToolDef[] = BASE_DEFS.map(traced);
 
-// ── the gated tool ───────────────────────────────────────────────────────────
+// ── the two conditional tools ────────────────────────────────────────────────
 
 /**
  * Registered ONLY while `checkoutLive` is true. Its ABSENCE is the product: there is
@@ -386,5 +477,39 @@ export const CHECKOUT_TOOL: ToolDef = traced({
     }, 350);
 
     return ok(`Order placed. ${money(total)} charged. Thanks.`);
+  },
+});
+
+/**
+ * The mirror image of `checkout`, and the reason the pair is worth having: a WebMCP
+ * surface is not just a list with one thing missing from it, it is a list that TRACKS
+ * the state of the page. `get_order` does not exist while there is nothing to read, and
+ * it appears at the same instant `checkout` disappears, because `placeOrder()` is the
+ * single state change that flips both.
+ *
+ * It also closes a real hole. Before this, the agent placed an order and had no way to
+ * read back what it had just done.
+ */
+export const ORDER_TOOL: ToolDef = traced({
+  name: "get_order",
+  description:
+    "Read back the order that was placed: what was bought, what it cost, and when. Only exists after an order has actually been placed.",
+  inputSchema: { type: "object", properties: {} },
+  annotations: { readOnlyHint: true },
+  execute: async () => {
+    const s = store.getState();
+    if (!s.order) return fail("No order has been placed.");
+    const rows = s.order.lines.map((l) => {
+      const p = byId(l.productId);
+      return `${l.qty}x ${p ? p.name : l.productId} (${l.productId})`;
+    });
+    const when = new Date(s.order.at).toLocaleTimeString();
+    return ok(
+      [
+        `Order placed at ${when}. Total ${money(s.order.total)}.`,
+        ...rows,
+        "Checkout is closed for this basket: the order is done and cannot be placed twice.",
+      ].join("\n")
+    );
   },
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import * as store from "./store";
-import { BASE_TOOLS, CHECKOUT_TOOL } from "./tools";
+import { BASE_TOOLS, CHECKOUT_TOOL, ORDER_TOOL } from "./tools";
 import { attachToolChangeProbe, getHost, onSeamError } from "./webmcp";
 import type { ToolRow } from "./types";
 
@@ -20,6 +20,9 @@ export function useStore(): store.State {
 export function useToolSurface() {
   const state = useStore();
   const live = store.checkoutLive(state);
+  // The other direction. placeOrder() flips both in one state change, so the two
+  // conditional tools swap places in a single rebuild of the surface.
+  const ordered = state.order !== null;
 
   // 1. THE WHOLE SURFACE, rebuilt as a function of the gate. Registering checkout
   //    through a second, separate effect left it callable-but-rejecting; registering
@@ -27,10 +30,14 @@ export function useToolSurface() {
   //    the tool surface IS derived state.
   useEffect(() => {
     const host = getHost();
-    const surface = live ? [...BASE_TOOLS, CHECKOUT_TOOL] : BASE_TOOLS;
+    const surface = [
+      ...BASE_TOOLS,
+      ...(live ? [CHECKOUT_TOOL] : []),
+      ...(ordered ? [ORDER_TOOL] : []),
+    ];
     const offs = surface.map((t) => host.register(t));
     return () => offs.forEach((off) => off());
-  }, [live]);
+  }, [live, ordered]);
 
   // 2. optional wiring, only after registration
   useEffect(() => {
@@ -103,6 +110,20 @@ export function useToolRows(): ToolRow[] {
     gated: true,
     callCount: counts.get("checkout")?.n ?? 0,
     lastArgs: counts.get("checkout")?.last,
+  });
+
+  // get_order is gated the other way. The rail only draws it once it is real: an empty
+  // "get_order NOT REGISTERED" slot sitting there from load would dilute the one thing
+  // the panel is for, which is the single tool that is missing.
+  rows.push({
+    name: ORDER_TOOL.name,
+    description: ORDER_TOOL.description,
+    readOnly: true,
+    untrusted: false,
+    registered: liveNames.has(ORDER_TOOL.name),
+    gated: true,
+    callCount: counts.get("get_order")?.n ?? 0,
+    lastArgs: counts.get("get_order")?.last,
   });
 
   return rows;

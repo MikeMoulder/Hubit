@@ -42,7 +42,10 @@
 
   results.push("=== SURFACE ===");
   const names = (await tools()).map((t) => t.name).sort();
-  check("10 tools at load, checkout absent", names.join(","), (a) => !a.includes("checkout") && a.split(",").length === 10);
+  check("13 tools at load, both conditional tools absent", names.join(","),
+    (a) => !a.includes("checkout") && !a.includes("get_order") && a.split(",").length === 13);
+  check("filter_catalog registered", names.join(","), has("filter_catalog"));
+  check("focus_product registered", names.join(","), has("focus_product"));
   check("compare_products registered", names.join(","), has("compare_products"));
   check("search_alternatives registered", names.join(","), has("search_alternatives"));
 
@@ -80,6 +83,13 @@
   check("remove item not in cart", await call("remove_from_cart", { product_id: "chair-stool" }), has("not in the cart"));
   check("update to 0 removes", await call("update_quantity", { product_id: "mon-27-1440", quantity: 0 }), has("Cart is empty"));
 
+  results.push("=== clear_cart ===");
+  check("clear on an empty cart is not an error", await call("clear_cart"), has("already empty"));
+  await call("add_to_cart", { product_id: "mon-24-1080" });
+  await call("add_to_cart", { product_id: "kb-membrane" });
+  check("clears every line", await call("clear_cart"), has("Cleared 2 lines"));
+  check("cart really is empty", await call("get_cart"), has("Cart is empty"));
+
   results.push("=== constraint: already have ===");
   click("monitor", '[data-audit="have-monitor"]');
   await sleep(300);
@@ -114,6 +124,32 @@
   check("cheapest item has no alternatives", await call("search_alternatives", { product_id: "mouse-light-wired" }), has("Nothing cheaper"));
   check("unknown id rejected", await call("search_alternatives", { product_id: "nope" }), has("No product with id"));
 
+  results.push("=== tools that move the HUMAN's screen ===");
+  const shelfHeading = () => (document.querySelector("#shelf-heading") || {}).textContent || "";
+  check("filter_catalog reports what is on screen", await call("filter_catalog", { category: "chair" }), has("looking at chairs"));
+  await sleep(300);
+  check("the shelf ACTUALLY moved", shelfHeading(), has("Chairs"),
+    "the agent changed what the human is looking at, not just what it told the human");
+  check("a query narrows it further", await call("filter_catalog", { query: "mesh" }), has("on screen"));
+  await sleep(300);
+  check("the grid shows the search", (document.body.textContent.match(/matches for "mesh"/) || [""])[0], has("mesh"));
+  check("empty query clears the search", await call("filter_catalog", { query: "" }), (a) => !has("matching")(a));
+  check("unknown category rejected", await call("filter_catalog", { category: "spaceship" }), has("Unknown category"));
+  check("no arguments rejected", await call("filter_catalog"), has("nothing to change"));
+  await call("filter_catalog", { category: "all" });
+  await sleep(300);
+  check("back to the whole shelf", shelfHeading(), has("Everything on the shelf"));
+
+  check("focus_product names the product", await call("focus_product", { product_id: "chair-ergo-mesh" }), has("Ergonomic mesh"));
+  await sleep(300);
+  check("quick view is ACTUALLY open", document.querySelector('[role="dialog"]') ? "open" : "closed", has("open"));
+  check("it is the right product", (document.querySelector("#qv-title") || {}).textContent || "", has("Ergonomic mesh"));
+  check("unknown id rejected", await call("focus_product", { product_id: "nope" }), has("No product with id"));
+  check("no id closes it", await call("focus_product"), has("Closed the quick view"));
+  await sleep(300);
+  check("quick view really closed", document.querySelector('[role="dialog"]') ? "open" : "closed", has("closed"));
+  check("moving the view did NOT touch the cart", await call("get_cart"), has("Cart is empty"));
+
   results.push("=== priority is a real rule ===");
   click("price", '[data-audit="priority-price"]');
   await sleep(300);
@@ -144,9 +180,19 @@
   await sleep(700);
   check("checkout gone again after order", (await get("checkout")) ? "present" : "absent", has("absent"));
 
+  results.push("=== get_order: the surface swaps, it does not just shrink ===");
+  check("get_order REGISTERED once there is an order", (await get("get_order")) ? "present" : "absent", has("present"),
+    "it appears in the same state change that removes checkout");
+  const placed = await call("get_order");
+  check("reads back the total", placed, has("$1,284"));
+  check("reads back what was bought", placed, (a) => has("chair-ergo-mesh")(a) && has("mon-ultra-34")(a));
+  check("says checkout is closed", placed, has("cannot be placed twice"));
+
   results.push("=== APPROVAL IS PER BASKET ===");
   click("start over", '[data-audit="start-over"]');
   await sleep(400);
+  check("get_order gone once the order is cleared", (await get("get_order")) ? "present" : "absent", has("absent"),
+    "conditional in both directions, not a tool that appears once and sticks");
   await call("add_to_cart", { product_id: "mon-24-1080" });
   await sleep(200);
   click("approve this basket", '[data-audit="approve-basket"]');

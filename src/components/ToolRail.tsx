@@ -9,10 +9,13 @@ import { useToolRows, useRuntime, useStore } from "@/lib/useHubit";
  * beat on a projector.
  *
  * One row carries the whole argument, so one row gets the whole panel. `checkout` sits
- * alone at the top at full weight; the ten always-on tools collapse behind a
- * disclosure. Listing eleven identical boxes says "look how many tools we built",
+ * alone at the top at full weight; the thirteen always-on tools collapse behind a
+ * disclosure. Listing fifteen identical boxes says "look how many tools we built",
  * which is not the pitch. One box that is not there says "the agent cannot do this",
  * which is.
+ *
+ * `get_order` is the one addition to that rule, and only once it is live: it draws in
+ * the same beat that `checkout` stops drawing, which is the point of having both.
  *
  * Rendered entirely from OUR registry via useToolRows. Never from `toolchange`,
  * which does not exist in ChatGPT's in-app browser (probe/FINDINGS.md finding 3).
@@ -24,7 +27,10 @@ export function ToolRail() {
   const [open, setOpen] = useState(false);
 
   const base = rows.filter((r) => !r.gated);
-  const gate = rows.find((r) => r.gated);
+  const gate = rows.find((r) => r.name === "checkout");
+  // Drawn only once it is live. See the note in useToolRows: a permanently empty second
+  // slot would compete with the one absence this panel exists to show.
+  const order = rows.find((r) => r.name === "get_order" && r.registered);
   const baseLive = base.filter((r) => r.registered).length;
 
   return (
@@ -81,6 +87,25 @@ export function ToolRail() {
               {gate.registered
                 ? "REGISTERED, the shopper approved this basket"
                 : "NOT REGISTERED, nothing for the agent to call"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* The mirror image: it appears in the same beat that checkout disappears. */}
+      {order && (
+        <div className="px-3 pt-2">
+          <div className="gate-open rounded-[var(--radius)] border border-[var(--color-ok)] bg-[color-mix(in_oklch,var(--color-ok)_14%,transparent)] px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-sm font-semibold">{order.name}</span>
+              {order.callCount > 0 && (
+                <span className="shrink-0 rounded border border-[var(--color-ok)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[var(--color-ok)]">
+                  {order.callCount}x
+                </span>
+              )}
+            </div>
+            <p className="mt-1.5 font-mono text-xs leading-relaxed text-[var(--color-ok)]">
+              REGISTERED, there is an order to read back
             </p>
           </div>
         </div>

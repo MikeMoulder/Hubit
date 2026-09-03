@@ -1,5 +1,5 @@
 import { CATALOG, byId } from "./catalog";
-import type { CartLine, Constraints, Proposal, Violation } from "./types";
+import type { CartLine, Category, Constraints, Proposal, Violation } from "./types";
 
 /**
  * Vanilla store, not React state. Tool `execute` callbacks run outside React and
@@ -15,13 +15,32 @@ export type ToolCall = {
   ok: boolean;
 };
 
+/**
+ * What the shopper is looking at. It lives HERE and not in React because a tool
+ * `execute` runs outside React and cannot reach a `useState` setter: `filter_catalog`
+ * and `focus_product` move the human's screen, so the human's screen has to be state
+ * the store owns.
+ *
+ * Nothing in here touches the gate. Looking at a different shelf is not a change to
+ * the cart or to the rules, so it must never invalidate approval.
+ */
+export type View = {
+  category: Category | "all";
+  query: string;
+  cartOpen: boolean;
+  quickView: string | null;
+};
+
 export type State = {
   lines: CartLine[];
   constraints: Constraints;
   /** Human granted permission to check out. Reset whenever the cart or rules change. */
   approved: boolean;
   pending: Proposal | null;
-  order: { total: number; at: number } | null;
+  /** Snapshot, not a pointer at the cart: `get_order` must keep reading the same
+   *  order even after the shopper starts filling the basket again. */
+  order: { total: number; at: number; lines: CartLine[] } | null;
+  view: View;
   calls: ToolCall[];
   seamErrors: string[];
 };
@@ -32,6 +51,7 @@ const initial: State = {
   approved: false,
   pending: null,
   order: null,
+  view: { category: "all", query: "", cartOpen: false, quickView: null },
   calls: [],
   seamErrors: [],
 };
@@ -95,6 +115,11 @@ export function addToCart(productId: string, qty = 1) {
   set(invalidateApproval({ lines }));
 }
 
+/** Empties the basket in one call. Still a change to the basket, so consent goes with it. */
+export function clearCart() {
+  set(invalidateApproval({ lines: [] }));
+}
+
 export function removeFromCart(productId: string) {
   set(invalidateApproval({ lines: state.lines.filter((l) => l.productId !== productId) }));
 }
@@ -106,6 +131,15 @@ export function updateQuantity(productId: string, qty: number) {
       lines: state.lines.map((l) => (l.productId === productId ? { ...l, qty } : l)),
     })
   );
+}
+
+/**
+ * The only writer of view state. Deliberately a plain `set`: it does NOT go through
+ * invalidateApproval, because an agent showing you a product must not be able to
+ * withdraw your consent as a side effect.
+ */
+export function setView(next: Partial<View>) {
+  set({ view: { ...state.view, ...next } });
 }
 
 export function setBudget(cents: number) {
@@ -150,7 +184,7 @@ export function revokeApproval() {
 }
 
 export function placeOrder() {
-  set({ order: { total: cartTotalCents(), at: Date.now() }, approved: false });
+  set({ order: { total: cartTotalCents(), at: Date.now(), lines: state.lines }, approved: false });
 }
 
 export function reset() {

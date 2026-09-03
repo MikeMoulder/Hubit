@@ -1,22 +1,22 @@
 "use client";
 
-import { useState } from "react";
 import { Catalog } from "@/components/Catalog";
 import { CartDrawer, QuickView } from "@/components/Overlays";
 import { RulesBar } from "@/components/RulesBar";
 import { SiteFooter, SiteHeader } from "@/components/Shell";
 import { ToolRail } from "@/components/ToolRail";
-import { useToolSurface, useRuntime } from "@/lib/useHubit";
-import type { Category } from "@/lib/types";
+import { useToolSurface, useRuntime, useStore } from "@/lib/useHubit";
+import { setView } from "@/lib/store";
 
 export default function Page() {
   useToolSurface();
   const runtime = useRuntime();
 
-  const [category, setCategory] = useState<Category | "all">("all");
-  const [query, setQuery] = useState("");
-  const [cartOpen, setCartOpen] = useState(false);
-  const [quickView, setQuickView] = useState<string | null>(null);
+  // Which shelf, which search, which overlay: all of it lives in the store rather than
+  // in useState, because `filter_catalog` and `focus_product` write to it from a tool
+  // callback that runs outside React entirely. Moving this out of the component is what
+  // lets the agent point at something instead of only reporting it afterwards.
+  const { category, query, cartOpen, quickView } = useStore().view;
 
   return (
     <>
@@ -24,16 +24,20 @@ export default function Page() {
       <div className="sticky top-0 z-30">
         <SiteHeader
           active={category}
-          onCategory={setCategory}
+          onCategory={(c) => setView({ category: c })}
           query={query}
-          onSearch={setQuery}
-          onOpenCart={() => setCartOpen(true)}
+          onSearch={(q) => setView({ query: q })}
+          onOpenCart={() => setView({ cartOpen: true })}
         />
         <RulesBar />
       </div>
 
       <main className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Catalog category={category} query={query} onQuickView={setQuickView} />
+        <Catalog
+          category={category}
+          query={query}
+          onQuickView={(id) => setView({ quickView: id })}
+        />
 
         <aside className="lg:sticky lg:top-[8.5rem] lg:h-[calc(100vh-10rem)]">
           <ToolRail />
@@ -47,10 +51,10 @@ export default function Page() {
         </aside>
       </main>
 
-      <SiteFooter onCategory={setCategory} />
+      <SiteFooter onCategory={(c) => setView({ category: c })} />
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
-      <QuickView id={quickView} onClose={() => setQuickView(null)} />
+      <CartDrawer open={cartOpen} onClose={() => setView({ cartOpen: false })} />
+      <QuickView id={quickView} onClose={() => setView({ quickView: null })} />
     </>
   );
 }
