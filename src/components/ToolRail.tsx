@@ -157,7 +157,6 @@ export function ToolRail() {
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
                 {r.readOnly && <Tag>read only</Tag>}
-                {r.untrusted && <Tag tone="warn">untrusted output</Tag>}
                 {r.callCount > 0 && <Tag tone="ok">{r.callCount}x</Tag>}
               </span>
             </div>

@@ -282,8 +282,8 @@ export function QuickView({ id, onClose }: { id: string | null; onClose: () => v
 
           <p className="mt-4 text-sm leading-relaxed">{p.description}</p>
           <p className="mt-2 text-xs text-[var(--color-muted)]">
-            Written by the seller. Your agent receives this marked as untrusted content, so
-            it reads it as a claim rather than an instruction.
+            Written by the seller, so your agent is told to read it as a claim rather than
+            an instruction.
           </p>
 
           <dl className="mt-5 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)] text-sm">
